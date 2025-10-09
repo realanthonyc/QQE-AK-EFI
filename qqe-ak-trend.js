@@ -6,7 +6,8 @@
 //  QQE + AK Trend Combined
 //  - Single QQE instance
 //  - Wilder's smoothing (ta.rma) for ATR-of-RSI
-//  v1.2.2
+//  - AK Scale Factor based on timeframe
+//  v1.2.6
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend Combined", shorttitle="QQE + AK Trend", overlay=false, max_lines_count=1, max_bars_back=800)
 
@@ -25,7 +26,28 @@ computeAk            = input.bool(true, "Compute AK Trend")
 showAkTrend          = input.bool(true, "Show AK Trend Line")
 input1               = input.int(3,  "Fast EMA 1", minval=1)
 input2               = input.int(8,  "Fast EMA 2", minval=1)
-ak_scale             = input.float(8.0, "AK Scale Factor", minval=0.1, step=0.1)
+
+// === AK Scale Factor Inputs for Different Timeframes ===
+ak_scale_less_15m    = input.float(28.0, "AK Scale Factor (<15m)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes less than 15 minutes")
+ak_scale_15m_1h      = input.float(16.0, "AK Scale Factor (15m-1h)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes between 15 minutes and 1 hour")
+ak_scale_1h_1d       = input.float(8.0,  "AK Scale Factor (>1h-1d)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes between 1 hour and 1 day")
+ak_scale_above_1d    = input.float(3.0,  "AK Scale Factor (>1d)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes above 1 day")
+
+// === AK Scale Factor based on timeframe ===
+getAkScaleFactor(_less_15m, _15m_1h, _1h_1d, _above_1d) =>
+    timeframeInMinutes = timeframe.period == "1" ? 1 :
+                         timeframe.period == "5" ? 5 :
+                         timeframe.period == "15" ? 15 :
+                         timeframe.period == "30" ? 30 :
+                         timeframe.period == "60" ? 60 :
+                         timeframe.period == "240" ? 240 :
+                         timeframe.period == "D" ? 1440 : 1440
+    akScale = timeframeInMinutes < 15 ? _less_15m :
+              timeframeInMinutes <= 60 ? _15m_1h :
+              timeframeInMinutes <= 1440 ? _1h_1d : _above_1d
+    akScale
+
+ak_scale = getAkScaleFactor(ak_scale_less_15m, ak_scale_15m_1h, ak_scale_1h_1d, ak_scale_above_1d)
 
 // === Calculate QQE (Single) ===
 calculateQQE(_src, _rsiLen, _sLen, _qqeFactor, _atrLen) =>
