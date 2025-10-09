@@ -6,8 +6,7 @@
 //  QQE + AK Trend Combined
 //  - Single QQE instance
 //  - Wilder's smoothing (ta.rma) for ATR-of-RSI
-//  - Optional Bollinger (gated) to avoid unused stdev cost
-//  v1.2.0
+//  v1.2.2
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend Combined", shorttitle="QQE + AK Trend", overlay=false, max_lines_count=1, max_bars_back=800)
 
@@ -21,13 +20,8 @@ sourcePrimary        = input.source(close, "RSI Source")
 // === QQE ATR length (Wilder) ===
 atrLen               = input.int(14, "ATR Length for QQE (Wilder)", minval=1)
 
-// === Optional: Bollinger on QQE (shifted to 0) ===
-showBollinger        = input.bool(false, "Compute & Show Bollinger on QQE?", tooltip="If off, Bollinger series are not computed.")
-bollingerLength      = input.int(50,  "BB Length",     minval=1, inline="bb", tooltip="Only used when Bollinger is enabled.")
-bollingerMultiplier  = input.float(0.35, "BB Mult",    minval=0.001, maxval=5, step=0.1, inline="bb")
-
 // === AK Trend Settings (optional) ===
-computeAk            = input.bool(true, "Compute AK Trend?")
+computeAk            = input.bool(true, "Compute AK Trend")
 showAkTrend          = input.bool(true, "Show AK Trend Line")
 input1               = input.int(3,  "Fast EMA 1", minval=1)
 input2               = input.int(8,  "Fast EMA 2", minval=1)
@@ -69,13 +63,6 @@ calculateQQE(_src, _rsiLen, _sLen, _qqeFactor, _atrLen) =>
 // === Main ===
 [qqeTrend, rsi0] = calculateQQE(sourcePrimary, rsiLengthPrimary, rsiSmoothingPrimary, qqeFactorPrimary, atrLen)
 
-// Optional Bollinger on the QQE trend (centered to 0 by subtracting 50 before)
-qqe0 = qqeTrend - 50
-bbBasis     = showBollinger ? ta.sma(qqe0, bollingerLength) : na
-bbDev       = showBollinger ? bollingerMultiplier * ta.stdev(qqe0, bollingerLength) : na
-bbUpper     = showBollinger ? bbBasis + bbDev : na
-bbLower     = showBollinger ? bbBasis - bbDev : na
-
 // AK Trend (compute gated)
 fastmaa = computeAk ? ta.ema(close, input1) : na
 fastmab = computeAk ? ta.ema(close, input2) : na
@@ -88,11 +75,6 @@ rsiColor = rsi0 >  thresholdPrimary ? color.rgb(144, 238, 144, 50) :
            rsi0 < -thresholdPrimary ? color.rgb(255, 99, 71,   50) :
                                       color.rgb(112, 112, 112, 50)
 plot(rsi0, color=rsiColor, title="RSI Histogram (Primary)", style=plot.style_columns)
-
-// Optional: plot Bollinger bands on QQE (0-centered)
-plot(showBollinger ? bbBasis : na, title="QQE BB Basis", color=color.new(color.white, 40))
-plot(showBollinger ? bbUpper : na, title="QQE BB Upper", color=color.new(color.aqua,  0))
-plot(showBollinger ? bbLower : na, title="QQE BB Lower", color=color.new(color.fuchsia,0))
 
 // Signals (same semantics: histogram over threshold)
 sigVal   = rsi0 >  thresholdPrimary ? rsi0 :
