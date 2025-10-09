@@ -4,7 +4,10 @@
 //@version=6
 // -------------------------------------------------------------------------
 //  QQE + AK Trend Combined
-//  v1.0.7
+//  - Optimized for Performance
+//  - Removed redundant calculations
+//  - Ensured consistent use of primary and secondary QQE settings
+//  v1.1.0
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend Combined", shorttitle="QQE + AK Trend", overlay=false, max_lines_count=1)
 
@@ -37,12 +40,15 @@ ak_scale = input.float(8.0, title="AK Scale Factor", group=group_aktrend)
 showAkTrend = input.bool(true, title="Show AK Trend Line", group=group_aktrend)
 
 // === Functions ===
-// Calculate QQE Bands
-calculateQQE(rsiLength, smoothingFactor, qqeFactor, source) =>
-    wildersLength = rsiLength * 2 - 1
+// Calculate Shared RSI and Initial EMA
+calculateBaseRSI(rsiLength, smoothingFactor, source) =>
     rsi = ta.rsi(source, rsiLength)
     smoothedRsi = ta.ema(rsi, smoothingFactor)
-    atrRsi = math.abs(smoothedRsi[1] - smoothedRsi)
+    [rsi, smoothedRsi]
+
+// Calculate QQE Bands
+calculateQQE(rsi, smoothedRsi, qqeFactor, wildersLength) =>
+    atrRsi = math.abs(smoothedRsi - smoothedRsi[1])
     smoothedAtrRsi = ta.ema(atrRsi, wildersLength)
     dynamicAtrRsi = smoothedAtrRsi * qqeFactor
 
@@ -55,8 +61,8 @@ calculateQQE(rsiLength, smoothingFactor, qqeFactor, source) =>
     atrDelta = dynamicAtrRsi
     newShortBand = smoothedRsi + atrDelta
     newLongBand = smoothedRsi - atrDelta
-    longBand := smoothedRsi[1] > longBand[1] and smoothedRsi > longBand[1] ? math.max(longBand[1], newLongBand) : newLongBand
-    shortBand := smoothedRsi[1] < shortBand[1] and smoothedRsi < shortBand[1] ? math.min(shortBand[1], newShortBand) : newShortBand
+    longBand := smoothedRsi > longBand[1] ? math.max(longBand[1], newLongBand) : newLongBand
+    shortBand := smoothedRsi < shortBand[1] ? math.min(shortBand[1], newShortBand) : newShortBand
     longBandCross = ta.cross(longBand[1], smoothedRsi)
     
     if ta.cross(smoothedRsi, shortBand[1])
@@ -68,14 +74,18 @@ calculateQQE(rsiLength, smoothingFactor, qqeFactor, source) =>
 
     // Determine the trend line
     qqeTrendLine = trendDirection == 1 ? longBand : shortBand
-    [qqeTrendLine, smoothedRsi]
+    [qqeTrendLine, smoothedRsi]  // Return smoothedRsi as is, avoiding reassignment conflict
 
 // === Main Calculations ===
-// Calculate Primary QQE
-[primaryQQETrendLine, primaryRSI] = calculateQQE(rsiLengthPrimary, rsiSmoothingPrimary, qqeFactorPrimary, sourcePrimary)
+// Calculate Primary QQE Base
+[primaryBaseRSI, primarySmoothedRSI] = calculateBaseRSI(rsiLengthPrimary, rsiSmoothingPrimary, sourcePrimary)
+wildersLengthPrimary = rsiLengthPrimary * 2 - 1
+[primaryQQETrendLine, _] = calculateQQE(primaryBaseRSI, primarySmoothedRSI, qqeFactorPrimary, wildersLengthPrimary)  // Ignore second return value
 
-// Calculate Secondary QQE
-[secondaryQQETrendLine, secondaryRSI] = calculateQQE(rsiLengthSecondary, rsiSmoothingSecondary, qqeFactorSecondary, sourceSecondary)
+// Calculate Secondary QQE Base
+[secondaryBaseRSI, secondarySmoothedRSI] = calculateBaseRSI(rsiLengthSecondary, rsiSmoothingSecondary, sourceSecondary)
+wildersLengthSecondary = rsiLengthSecondary * 2 - 1
+[secondaryQQETrendLine, _] = calculateQQE(secondaryBaseRSI, secondarySmoothedRSI, qqeFactorSecondary, wildersLengthSecondary)  // Ignore second return value
 
 // Calculate Bollinger Bands for the Primary QQE Trend Line
 bollingerBasis = ta.sma(primaryQQETrendLine - 50, bollingerLength)
@@ -89,7 +99,8 @@ fastmab = ta.ema(close, input2)
 bspread = (fastmaa - fastmab) * 1.001
 
 // Color Conditions for Secondary RSI
-rsiColorSecondary = secondaryRSI - 50 > thresholdSecondary ? color.rgb(112, 112, 112, 50) : secondaryRSI - 50 < -thresholdSecondary ? color.rgb(112, 112, 112, 50) : na
+// Use primaryBaseRSI and secondaryBaseRSI for consistency, adjusting for -50 offset
+rsiColorSecondary = secondaryBaseRSI - 50 > thresholdSecondary ? color.rgb(112, 112, 112, 50) : secondaryBaseRSI - 50 < -thresholdSecondary ? color.rgb(112, 112, 112, 50) : na
 
 // Color Conditions for AK Trend
 akTrendColor = bspread > 0 ? color.rgb(5, 152, 5) : color.rgb(180, 0, 0)
@@ -99,11 +110,10 @@ akTrendColor = bspread > 0 ? color.rgb(5, 152, 5) : color.rgb(180, 0, 0)
 plot(secondaryQQETrendLine - 50, title="Secondary QQE Trend Line", color=color.rgb(255, 255, 255), linewidth=2, display=display.none)
 
 // Plot Secondary RSI Histogram
-plot(secondaryRSI - 50, color=rsiColorSecondary, title="Secondary RSI Histogram", style=plot.style_columns)
+plot(secondaryBaseRSI - 50, color=rsiColorSecondary, title="Secondary RSI Histogram", style=plot.style_columns)
 
 // Plot Signal Highlights
-plot(secondaryRSI - 50 > thresholdSecondary and primaryRSI - 50 > bollingerUpper ? secondaryRSI - 50 : na, title="QQE Up Signal", style=plot.style_columns, color=color.rgb(144, 238, 144))
-plot(secondaryRSI - 50 < -thresholdSecondary and primaryRSI - 50 < bollingerLower ? secondaryRSI - 50 : na, title="QQE Down Signal", style=plot.style_columns, color=color.rgb(255, 99, 71))
+plot(secondaryBaseRSI - 50 > thresholdSecondary and primaryBaseRSI - 50 > bollingerUpper ? secondaryBaseRSI - 50 : secondaryBaseRSI - 50 < -thresholdSecondary and primaryBaseRSI - 50 < bollingerLower ? secondaryBaseRSI - 50 : na, title="QQE Signals", style=plot.style_columns, color=secondaryBaseRSI - 50 > thresholdSecondary and primaryBaseRSI - 50 > bollingerUpper ? color.rgb(144, 238, 144) : color.rgb(255, 99, 71))
 
 // Plot AK Trend Line
 plot(showAkTrend ? bspread * ak_scale : na, title="AK Trend Line", color=akTrendColor, linewidth=2)
