@@ -3,14 +3,14 @@
 
 //@version=6
 // -------------------------------------------------------------------------
-//  QQE + AK Trend + EFI Combined
+//  QQE + AK Trend + EFI
 //  - QQE histogram with Wilder's smoothing (ta.rma) for ATR-of-RSI
 //  - AK Scale Factor based on timeframe
 //  - Elder Force Index (EFI) with dynamic scaling to match QQE trend range
-//  - Dynamic scaling adjusts EFI highest/lowest values to QQE tallest/lowest bars
-//  v1.4.5
+//  - Dynamic scaling adjusts EFI height based on QQE range over the specified number of bars
+//  v1.4.6
 // -------------------------------------------------------------------------
-indicator("QQE + AK Trend + EFI Combined", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
+indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
 
 // === QQE Settings ===
 rsiLengthPrimary     = input.int(6, "RSI Length", minval=1, group="QQE Settings")
@@ -31,8 +31,8 @@ ak_scale_above_1d    = input.float(3.0,  "AK Scale Factor (>1d)", minval=0.1, st
 
 // === EFI Settings ===
 efiLength            = input.int(13, "EFI Length", minval=1, group="EFI Settings")
-efiMultiplier        = input.float(2.25, "EFI Multiplier", minval=0.1, step=0.05, group="EFI Settings")
-dynamicScalingLength = input.int(300, "Dynamic Scaling Length", minval=1, group="EFI Settings")
+efiMultiplier        = input.float(2.25, "EFI Multiplier", minval=0.1, step=0.05, tooltip="Multiplier to adjust EFI height relative to QQE range (higher value makes EFI taller).", group="EFI Settings")
+dynamicScalingBars   = input.int(300, "Dynamic Scaling Bars", minval=1, tooltip="Number of bars to look back for dynamic scaling of EFI (larger value considers more historical data for range calculation).", group="EFI Settings")
 
 // === AK Scale Factor based on timeframe ===
 getAkScaleFactor(_less_15m, _15m_1h, _1h_1d, _above_1d) =>
@@ -92,10 +92,10 @@ efi = ta.ema(ta.change(close) * volume, efiLength)
 
 // Dynamic scaling to match QQE trend range
 qqeShifted = qqeTrend - 50
-qqeHighest = ta.highest(qqeShifted, dynamicScalingLength)
-qqeLowest = ta.lowest(qqeShifted, dynamicScalingLength)
-efiHighest = ta.highest(efi, dynamicScalingLength)
-efiLowest = ta.lowest(efi, dynamicScalingLength)
+qqeHighest = ta.highest(qqeShifted, dynamicScalingBars)
+qqeLowest = ta.lowest(qqeShifted, dynamicScalingBars)
+efiHighest = ta.highest(efi, dynamicScalingBars)
+efiLowest = ta.lowest(efi, dynamicScalingBars)
 scaleFactor = efiMultiplier * (math.max(math.abs(qqeHighest), math.abs(qqeLowest)) / math.max(math.max(math.abs(efiHighest), math.abs(efiLowest)), 0.0001))
 scaledEfi = efi * scaleFactor
 
