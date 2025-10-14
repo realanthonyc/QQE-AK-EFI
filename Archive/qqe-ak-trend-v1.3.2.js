@@ -4,35 +4,36 @@
 //@version=6
 // -------------------------------------------------------------------------
 //  QQE + AK Trend + EFI Combined
-//  - QQE histogram with Wilder's smoothing (ta.rma) for ATR-of-RSI
+//  - QQE instance
+//  - Wilder's smoothing (ta.rma) for ATR-of-RSI
 //  - AK Scale Factor based on timeframe
-//  - Elder Force Index (EFI) with dynamic scaling to match QQE trend range
-//  - Dynamic scaling adjusts EFI highest/lowest values to QQE tallest/lowest bars
-//  v1.4.5
+//  - Elder Force Index (EFI) with normalization to match scales
+//  v1.3.2
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend + EFI Combined", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
 
 // === QQE Settings ===
-rsiLengthPrimary     = input.int(6, "RSI Length", minval=1, group="QQE Settings")
-rsiSmoothingPrimary  = input.int(5, "RSI Smoothing", minval=1, group="QQE Settings")
-qqeFactorPrimary     = input.float(2.0, "QQE Factor", minval=0.1, step=0.1, tooltip="Lower = smoother QQE band.", group="QQE Settings")
-thresholdPrimary     = input.float(10.0, "Threshold", minval=0.1, step=0.1, tooltip="RSI distance from 50 to color histogram.", group="QQE Settings")
+rsiLengthPrimary     = input.int(6,   "RSI Length",     minval=1, group="QQE Settings")
+rsiSmoothingPrimary  = input.int(5,   "RSI Smoothing",  minval=1, group="QQE Settings")
+qqeFactorPrimary     = input.float(2.0, "QQE Factor",   minval=0.1, step=0.1, tooltip="Lower = smoother QQE band.", group="QQE Settings")
+thresholdPrimary     = input.float(10.0, "Threshold",   minval=0.1, step=0.1, tooltip="RSI distance from 50 to color histogram.", group="QQE Settings")
 sourcePrimary        = input.source(close, "RSI Source", group="QQE Settings")
 atrLen               = input.int(14, "ATR Length for QQE (Wilder)", minval=1, group="QQE Settings")
 
 // === AK Trend Settings ===
-showAkTrend          = input.bool(true, "Compute and show the AK Trend line", group="AK Trend Settings")
-input1               = input.int(3, "Fast EMA 1", minval=1, group="AK Trend Settings")
-input2               = input.int(8, "Fast EMA 2", minval=1, group="AK Trend Settings")
-ak_scale_less_15m    = input.float(32.0, "AK Scale Factor (<15m)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes less than 15 minutes", group="AK Trend Settings")
+showAkTrend          = input.bool(true, "Compute and Show AK Trend Line", group="AK Trend Settings")
+input1               = input.int(3,  "Fast EMA 1", minval=1, group="AK Trend Settings")
+input2               = input.int(8,  "Fast EMA 2", minval=1, group="AK Trend Settings")
+ak_scale_less_15m    = input.float(28.0, "AK Scale Factor (<15m)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes less than 15 minutes", group="AK Trend Settings")
 ak_scale_15m_1h      = input.float(16.0, "AK Scale Factor (15m-1h)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes between 15 minutes and 1 hour", group="AK Trend Settings")
 ak_scale_1h_1d       = input.float(8.0,  "AK Scale Factor (>1h-1d)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes between 1 hour and 1 day", group="AK Trend Settings")
 ak_scale_above_1d    = input.float(3.0,  "AK Scale Factor (>1d)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes above 1 day", group="AK Trend Settings")
 
 // === EFI Settings ===
 efiLength            = input.int(13, "EFI Length", minval=1, group="EFI Settings")
-efiMultiplier        = input.float(2.25, "EFI Multiplier", minval=0.1, step=0.05, group="EFI Settings")
-dynamicScalingLength = input.int(300, "Dynamic Scaling Length", minval=1, group="EFI Settings")
+normalizeEfi         = input.bool(true, "Normalize EFI", tooltip="Normalize EFI to prevent scale mismatch with QQE/AK.", group="EFI Settings")
+normalizeLength      = input.int(200, "EFI Normalize Length", minval=1, tooltip="Smoothing length for EFI normalization.", group="EFI Settings")
+targetAmplitude      = input.float(10.0, "EFI Target Amplitude", minval=0.1, step=0.1, tooltip="Target range for normalized EFI (e.g., +/-10).", group="EFI Settings")
 
 // === AK Scale Factor based on timeframe ===
 getAkScaleFactor(_less_15m, _15m_1h, _1h_1d, _above_1d) =>
@@ -47,9 +48,10 @@ getAkScaleFactor(_less_15m, _15m_1h, _1h_1d, _above_1d) =>
               timeframeInMinutes <= 60 ? _15m_1h :
               timeframeInMinutes <= 1440 ? _1h_1d : _above_1d
     akScale
+
 ak_scale = getAkScaleFactor(ak_scale_less_15m, ak_scale_15m_1h, ak_scale_1h_1d, ak_scale_above_1d)
 
-// === Calculate QQE ===
+// === Calculate QQE (Single) ===
 calculateQQE(_src, _rsiLen, _sLen, _qqeFactor, _atrLen) =>
     // RSI and smoothing
     _rsi         = ta.rsi(_src, _rsiLen)
@@ -64,10 +66,13 @@ calculateQQE(_src, _rsiLen, _sLen, _qqeFactor, _atrLen) =>
     var float _longBand = na
     var float _shortBand = na
     var int   _trendDir  = 0
+
     _newShort = _smoothedRsi + _delta
     _newLong  = _smoothedRsi - _delta
+
     _longPrev  = nz(_longBand[1],  _newLong)
     _shortPrev = nz(_shortBand[1], _newShort)
+
     _longBand  := _smoothedRsi > _longPrev  ? math.max(_longPrev,  _newLong)  : _newLong
     _shortBand := _smoothedRsi < _shortPrev ? math.min(_shortPrev, _newShort) : _newShort
 
@@ -75,6 +80,7 @@ calculateQQE(_src, _rsiLen, _sLen, _qqeFactor, _atrLen) =>
     _crossUp = _smoothedRsi > _shortPrev and _smoothedRsi[1] <= _shortPrev
     _crossDn = _smoothedRsi < _longPrev  and _smoothedRsi[1] >= _longPrev
     _trendDir := _crossUp ? 1 : _crossDn ? -1 : nz(_trendDir[1], 0)
+
     _qqeTrendLine = _trendDir == 1 ? _longBand : _shortBand
     [_qqeTrendLine, _smoothedRsi - 50]  // return QQE trend (unshifted) and RSI shifted to 0
 
@@ -90,29 +96,20 @@ akTrendColor = bspread > 0 ? color.rgb(5, 152, 5) : color.rgb(180, 0, 0)
 // EFI Calculation
 efi = ta.ema(ta.change(close) * volume, efiLength)
 
-// Dynamic scaling to match QQE trend range
-qqeShifted = qqeTrend - 50
-qqeHighest = ta.highest(qqeShifted, dynamicScalingLength)
-qqeLowest = ta.lowest(qqeShifted, dynamicScalingLength)
-efiHighest = ta.highest(efi, dynamicScalingLength)
-efiLowest = ta.lowest(efi, dynamicScalingLength)
-scaleFactor = efiMultiplier * (math.max(math.abs(qqeHighest), math.abs(qqeLowest)) / math.max(math.max(math.abs(efiHighest), math.abs(efiLowest)), 0.0001))
-scaledEfi = efi * scaleFactor
+// Normalize EFI if enabled
+smoothAbsEfi = ta.rma(math.abs(efi), normalizeLength)
+normalizedEfi = normalizeEfi and smoothAbsEfi != 0 ? (efi / smoothAbsEfi) * targetAmplitude : efi
 
 // === Plotting ===
-// QQE histogram (shifted RSI around 0)
+
+// RSI histogram (shifted RSI around 0, middle layer, using QQE Signals' opaque colors)
 rsiColor = rsi0 >  thresholdPrimary ? color.rgb(144, 238, 144) :
            rsi0 < -thresholdPrimary ? color.rgb(255, 99, 71) :
                                       color.rgb(112, 112, 112, 50)
-plot(rsi0, color=rsiColor, title="QQE Histogram", style=plot.style_columns)
+plot(rsi0, color=rsiColor, title="RSI Histogram (Primary)", style=plot.style_columns)
 
-// EFI area
-efiAreaColor = scaledEfi >= 0 ? color.rgb(144, 238, 144, 60) : color.rgb(255, 99, 71, 60)
-plot(scaledEfi, color=efiAreaColor, title="EFI Area", style=plot.style_area, display=display.none)
+// EFI line (bottom layer)
+plot(normalizedEfi, color=#F44336, title="Elder Force Index")
 
-// EFI line (overlay to preserve original shape)
-plot(scaledEfi, color=color.rgb(254,185,55), title="EFI Line", linewidth=1)
-
-// AK Trend line (draw only when requested)
-akTrendValue = showAkTrend ? bspread * ak_scale : na
-plot(akTrendValue, title="AK Trend Line", color=akTrendColor, linewidth=2)
+// AK Trend line (top layer, draw only when requested)
+plot(showAkTrend ? bspread * ak_scale : na, title="AK Trend Line", color=akTrendColor, linewidth=2)
