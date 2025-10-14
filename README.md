@@ -1,2 +1,2 @@
-# QQE-AK-Trend
-QQE + AK Trend for TradingView
+# QQE-AK-EFI
+QQE + AK Trend + EFI for TradingView
