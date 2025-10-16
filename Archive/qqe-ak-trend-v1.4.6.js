@@ -8,7 +8,7 @@
 //  - AK Scale Factor based on timeframe
 //  - Elder Force Index (EFI) with dynamic scaling to match QQE trend range
 //  - Dynamic scaling adjusts EFI height based on QQE range over the specified number of bars
-//  v1.4.8
+//  v1.4.6
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
 
@@ -36,10 +36,16 @@ dynamicScalingBars   = input.int(300, "Dynamic Scaling Bars", minval=1, tooltip=
 
 // === AK Scale Factor based on timeframe ===
 getAkScaleFactor(_less_15m, _15m_1h, _1h_1d, _above_1d) =>
-    timeframeInSeconds = timeframe.in_seconds()
-    akScale = timeframeInSeconds < 900 ? _less_15m :  // 15m (900 seconds)
-              timeframeInSeconds <= 3600 ? _15m_1h :  // 1h (3600 seconds)
-              timeframeInSeconds <= 86400 ? _1h_1d : _above_1d  // 1d (86400 seconds)
+    timeframeInMinutes = timeframe.period == "1" ? 1 :
+                         timeframe.period == "5" ? 5 :
+                         timeframe.period == "15" ? 15 :
+                         timeframe.period == "30" ? 30 :
+                         timeframe.period == "60" ? 60 :
+                         timeframe.period == "240" ? 240 :
+                         timeframe.period == "D" ? 1440 : 1440
+    akScale = timeframeInMinutes < 15 ? _less_15m :
+              timeframeInMinutes <= 60 ? _15m_1h :
+              timeframeInMinutes <= 1440 ? _1h_1d : _above_1d
     akScale
 ak_scale = getAkScaleFactor(ak_scale_less_15m, ak_scale_15m_1h, ak_scale_1h_1d, ak_scale_above_1d)
 
