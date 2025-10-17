@@ -8,9 +8,7 @@
 //  - AK Scale Factor based on timeframe
 //  - Elder Force Index (EFI) with dynamic scaling to match QQE trend range
 //  - Dynamic scaling adjusts EFI height based on QQE range over the specified number of bars
-//  - Divergence visualization between AK Trend and EFI with background color
-//  - EFI display disabled when volume = 0 to avoid distortion
-//  v1.5.5
+//  v1.4.8
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
 
@@ -35,11 +33,6 @@ ak_scale_above_1d    = input.float(3.0,  "AK Scale Factor (>1d)", minval=0.1, st
 efiLength            = input.int(13, "EFI Length", minval=1, group="EFI Settings")
 efiMultiplier        = input.float(2.25, "EFI Multiplier", minval=0.1, step=0.05, tooltip="Multiplier to adjust EFI height relative to QQE range (higher value makes EFI taller).", group="EFI Settings")
 dynamicScalingBars   = input.int(300, "Dynamic Scaling Bars", minval=1, tooltip="Number of bars to look back for dynamic scaling of EFI (larger value considers more historical data for range calculation).", group="EFI Settings")
-
-// === Divergence Settings ===
-showDivergence = input.bool(true, "Show AK-EFI Divergence", group="AK-EFI Divergence Settings")
-colorLongRisk  = input.color(color.rgb(157, 255, 30, 88), "Long Risk", group="AK-EFI Divergence Settings")
-colorShortRisk = input.color(color.rgb(255, 127, 180, 88), "Short Risk", group="AK-EFI Divergence Settings")
 
 // === AK Scale Factor based on timeframe ===
 getAkScaleFactor(_less_15m, _15m_1h, _1h_1d, _above_1d) =>
@@ -86,8 +79,7 @@ calculateQQE(_src, _rsiLen, _sLen, _qqeFactor, _atrLen) =>
 fastmaa = showAkTrend ? ta.ema(close, input1) : na
 fastmab = showAkTrend ? ta.ema(close, input2) : na
 bspread = showAkTrend ? (fastmaa - fastmab) * 1.001 : na
-akTrendColor = bspread > 0 ? color.rgb(5, 152, 5, 30) : color.rgb(180, 0, 0, 30)
-akDirection = bspread > 0 ? 1 : bspread < 0 ? -1 : 0
+akTrendColor = bspread > 0 ? color.rgb(5, 152, 5) : color.rgb(180, 0, 0)
 
 // EFI Calculation
 efi = ta.ema(ta.change(close) * volume, efiLength)
@@ -99,14 +91,7 @@ qqeLowest = ta.lowest(qqeShifted, dynamicScalingBars)
 efiHighest = ta.highest(efi, dynamicScalingBars)
 efiLowest = ta.lowest(efi, dynamicScalingBars)
 scaleFactor = efiMultiplier * (math.max(math.abs(qqeHighest), math.abs(qqeLowest)) / math.max(math.max(math.abs(efiHighest), math.abs(efiLowest)), 0.0001))
-scaledEfi = volume > 0 ? efi * scaleFactor : na
-efiDirection = scaledEfi > 0 ? 1 : scaledEfi < 0 ? -1 : 0
-
-// AK-EFI Divergence visualization
-var color divergenceColor = na
-if showDivergence
-    divergenceColor := akDirection == 1 and efiDirection == -1 ? colorLongRisk : akDirection == -1 and efiDirection == 1 ? colorShortRisk : na
-bgcolor(divergenceColor, title="Divergence Background")
+scaledEfi = efi * scaleFactor
 
 // === Plotting ===
 // QQE histogram (shifted RSI around 0)
