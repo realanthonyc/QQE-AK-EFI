@@ -10,7 +10,7 @@
 //  - Dynamic scaling adjusts EFI height based on QQE range over the specified number of bars
 //  - Divergence visualization between AK Trend and EFI with background color
 //  - EFI display disabled when volume = 0 to avoid distortion
-//  v1.5.5
+//  v1.5.6
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
 
@@ -26,7 +26,7 @@ atrLen               = input.int(14, "ATR Length for QQE (Wilder)", minval=1, gr
 showAkTrend          = input.bool(true, "Compute and show the AK Trend line", group="AK Trend Settings")
 input1               = input.int(3, "Fast EMA 1", minval=1, group="AK Trend Settings")
 input2               = input.int(8, "Fast EMA 2", minval=1, group="AK Trend Settings")
-ak_scale_less_15m    = input.float(32.0, "AK Scale Factor (<15m)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes less than 15 minutes", group="AK Trend Settings")
+ak_scale_less_15m    = input.float(36.0, "AK Scale Factor (<15m)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes less than 15 minutes", group="AK Trend Settings")
 ak_scale_15m_1h      = input.float(16.0, "AK Scale Factor (15m-1h)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes between 15 minutes and 1 hour", group="AK Trend Settings")
 ak_scale_1h_1d       = input.float(8.0,  "AK Scale Factor (>1h-1d)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes between 1 hour and 1 day", group="AK Trend Settings")
 ak_scale_above_1d    = input.float(3.0,  "AK Scale Factor (>1d)", minval=0.1, step=0.1, tooltip="Scale factor for timeframes above 1 day", group="AK Trend Settings")
@@ -120,7 +120,7 @@ efiAreaColor = scaledEfi >= 0 ? color.rgb(144, 238, 144, 60) : color.rgb(255, 99
 plot(scaledEfi, color=efiAreaColor, title="EFI Area", style=plot.style_area, display=display.none)
 
 // EFI line (overlay to preserve original shape)
-plot(scaledEfi, color=color.rgb(254,185,55), title="EFI Line", linewidth=1)
+plot(scaledEfi, color=color.rgb(254,185,55), title="EFI Line", linewidth=2)
 
 // AK Trend line (draw only when requested)
 akTrendValue = showAkTrend ? bspread * ak_scale : na
