@@ -1,5 +1,5 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © Anthony C. https://x.com/anthonycxc
+// © realanthonyc https://www.tradingview.com/u/realanthonyc
 
 //@version=6
 // -------------------------------------------------------------------------
@@ -10,9 +10,10 @@
 //  - Dynamic scaling adjusts EFI height based on QQE range over the specified number of bars
 //  - Divergence visualization between AK Trend and EFI with background color
 //  - EFI display disabled when volume = 0 to avoid distortion
-//  v1.5.6
+//  On GitHub: https://github.com/realanthonyc/QQE-AK-EFI/blob/main/qqe-ak-trend.pine
+//  v1.5.8
 // -------------------------------------------------------------------------
-indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, max_lines_count=1, max_bars_back=800)
+indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, precision=0, max_lines_count=1, max_bars_back=800)
 
 // === QQE Settings ===
 rsiLengthPrimary     = input.int(6, "RSI Length", minval=1, group="QQE Settings")
@@ -106,12 +107,12 @@ efiDirection = scaledEfi > 0 ? 1 : scaledEfi < 0 ? -1 : 0
 var color divergenceColor = na
 if showDivergence
     divergenceColor := akDirection == 1 and efiDirection == -1 ? colorLongRisk : akDirection == -1 and efiDirection == 1 ? colorShortRisk : na
-bgcolor(divergenceColor, title="Divergence Background")
+bgcolor(divergenceColor, title="AK-EFI Divergence Background")
 
 // === Plotting ===
 // QQE histogram (shifted RSI around 0)
-rsiColor = rsi0 >  thresholdPrimary ? color.rgb(144, 238, 144) :
-           rsi0 < -thresholdPrimary ? color.rgb(255, 99, 71) :
+rsiColor = rsi0 >  thresholdPrimary ? color.new(#9FE1D7, 15) :
+           rsi0 < -thresholdPrimary ? color.new(#FAB3C9, 15) :
                                       color.rgb(112, 112, 112, 50)
 plot(rsi0, color=rsiColor, title="QQE Histogram", style=plot.style_columns)
 
@@ -120,7 +121,7 @@ efiAreaColor = scaledEfi >= 0 ? color.rgb(144, 238, 144, 60) : color.rgb(255, 99
 plot(scaledEfi, color=efiAreaColor, title="EFI Area", style=plot.style_area, display=display.none)
 
 // EFI line (overlay to preserve original shape)
-plot(scaledEfi, color=color.rgb(254,185,55), title="EFI Line", linewidth=2)
+plot(scaledEfi, color=color.rgb(254,185,55), title="EFI Line", linewidth=1)
 
 // AK Trend line (draw only when requested)
 akTrendValue = showAkTrend ? bspread * ak_scale : na
