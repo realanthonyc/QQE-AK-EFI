@@ -10,7 +10,7 @@
 //  - Dynamic scaling adjusts EFI height based on QQE range over the specified number of bars
 //  - Divergence visualization between AK Trend and EFI with background color
 //  - EFI display disabled when volume = 0 to avoid distortion
-//  On GitHub: https://github.com/realanthonyc/QQE-AK-EFI/blob/main/qqe-ak-trend.pine
+//  On GitHub: https://github.com/realanthonyc/QQE-AK-EFI
 //  v1.5.8
 // -------------------------------------------------------------------------
 indicator("QQE + AK Trend + EFI", shorttitle="QQE + AK + EFI", overlay=false, precision=0, max_lines_count=1, max_bars_back=800)
